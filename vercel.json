@@ -1,9 +1,8 @@
-// vercel.json
 {
   "functions": {
     "api/bot.py": {
-      "maxDuration": 30, // Aumenta el tiempo de ejecución si Google Vision tarda
-      "memory": 512      // Más memoria si procesas archivos grandes
+      "maxDuration": 30, 
+      "memory": 512     
     }
   }
 }
