@@ -10,3 +10,40 @@ body { font-family: Arial, sans-serif; text-align: center; margin: 40px; }
 }
 #drop-zone.dragover { background-color: #f0f8ff; border-color: #007bff; }
 #status { margin-top: 20px; font-weight: bold; }
+
+/* ¡NUEVOS ESTILOS! */
+#result-container {
+    margin: 20px auto;
+    max-width: 600px;
+    text-align: left;
+}
+
+#result-text {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-family: 'Courier New', Courier, monospace; /* Mejor para texto plano */
+    box-sizing: border-box; /* Importante para que el padding no desborde el ancho */
+}
+
+#copy-button {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+#copy-button:hover {
+    background-color: #0056b3;
+}
+
+.hidden {
+    display: none;
+}
