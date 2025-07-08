@@ -1,15 +1,19 @@
-// --- Mismo código inicial ---
+// --- Elementos del DOM ---
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 const statusDiv = document.getElementById('status');
+const resultContainer = document.getElementById('result-container');
+const resultText = document.getElementById('result-text');
+const copyButton = document.getElementById('copy-button');
 
+// Configurar el worker de pdf.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
 
+// --- Eventos de Arrastre (sin cambios) ---
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
     dropZone.addEventListener(eventName, preventDefaults, false);
 });
 function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
-
 ['dragenter', 'dragover'].forEach(eventName => {
     dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
 });
@@ -20,25 +24,28 @@ function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
 dropZone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files), false);
 fileInput.addEventListener('change', (e) => handleFiles(e.target.files), false);
 
-// --- La lógica principal sigue siendo la misma, pero llamará a las nuevas funciones de extracción ---
+// --- Lógica de Procesamiento de Archivos (actualizada) ---
 async function handleFiles(files) {
     if (files.length === 0) {
         statusDiv.textContent = 'No se seleccionó ningún archivo.';
         return;
     }
     const file = files[0];
+    
+    // Ocultar resultados anteriores mientras se procesa uno nuevo
+    resultContainer.classList.add('hidden');
 
     try {
         statusDiv.textContent = 'Leyendo archivo...';
         let image;
         if (file.type === "application/pdf") {
-            statusDiv.textContent = 'Convirtiendo PDF a imagen... (esto puede tardar)';
+            statusDiv.textContent = 'Convirtiendo PDF a imagen...';
             image = await getImageFromPDF(file);
         } else {
             image = file;
         }
 
-        statusDiv.textContent = 'Reconociendo texto con OCR... (esto es lo que más tarda)';
+        statusDiv.textContent = 'Reconociendo texto con OCR... (esto puede tardar)';
         const { data: { text } } = await Tesseract.recognize(image, 'spa', {
             logger: m => {
                 if (m.status === 'recognizing text') {
@@ -47,15 +54,17 @@ async function handleFiles(files) {
             }
         });
 
-        statusDiv.textContent = 'Extrayendo datos estructurados...';
-        // ¡NUEVO! Llamamos a la función de extracción avanzada.
-        const datos = extraerDatosDetallados(text);
+        // --- ¡AQUÍ ESTÁ EL CAMBIO! ---
+        // En lugar de procesar y crear un Excel, mostramos el texto.
+        
+        statusDiv.textContent = '¡Proceso completado!';
+        
+        // 1. Poner el texto extraído en el textarea
+        resultText.value = text;
+        
+        // 2. Mostrar el contenedor de resultados
+        resultContainer.classList.remove('hidden');
 
-        statusDiv.textContent = 'Creando archivo Excel...';
-        // ¡NUEVO! Llamamos a la función de creación de Excel con múltiples hojas.
-        crearYDescargarExcelDetallado(datos);
-
-        statusDiv.textContent = '¡Listo! El archivo Excel se ha descargado.';
     } catch (error) {
         console.error(error);
         statusDiv.textContent = `Error: ${error.message}`;
@@ -75,91 +84,22 @@ async function getImageFromPDF(pdfFile) {
     return canvas.toDataURL();
 }
 
-// =================================================================================
-// ¡AQUÍ ESTÁ LA NUEVA LÓGICA DE EXTRACCIÓN!
-// =================================================================================
+// --- ¡NUEVA! Lógica del botón de Copiar ---
+copyButton.addEventListener('click', () => {
+    // Seleccionar el texto dentro del textarea
+    resultText.select();
+    resultText.setSelectionRange(0, 99999); // Para compatibilidad con móviles
 
-function extraerDatosDetallados(texto) {
-    const lineas = texto.split('\n'); // Dividimos el texto completo en líneas individuales
-    const resumen = {};
-    const articulos = [];
-
-    // --- Definimos nuestras Expresiones Regulares (RegEx) ---
-
-    // RegEx para encontrar el total. Busca "TOTAL" (insensible a mayúsculas) seguido de un número.
-    const regexTotal = /(?:TOTAL|IMPORTE)\s*€?\s*([\d,]+\.?\d*)/i;
-    // RegEx para la fecha.
-    const regexFecha = /\d{2}[/-]\d{2}[/-]\d{2,4}/;
-    
-    // RegEx para identificar una línea de artículo.
-    // Esta es la más importante y compleja. Busca:
-    // (Cualquier texto al principio) (un espacio) (un número con 2 decimales al final de la línea)
-    // Ejemplo: "PAN DE MOLDE 1,50" -> Captura "PAN DE MOLDE" y "1,50"
-    const regexArticulo = /^(.*?)\s+([\d,]+\.\d{2})$/;
-
-    // --- Extraemos la información del Resumen ---
-    resumen['Comercio'] = lineas[0] || 'No encontrado'; // Asumimos que el nombre del comercio es la primera línea.
-    
-    const matchFecha = texto.match(regexFecha);
-    if (matchFecha) resumen['Fecha'] = matchFecha[0];
-
-    const matchTotal = texto.match(regexTotal);
-    if (matchTotal) resumen['Total'] = parseFloat(matchTotal[1].replace(',', '.'));
-
-    // --- Iteramos sobre cada línea para encontrar los artículos ---
-    for (const linea of lineas) {
-        const lineaLimpia = linea.trim();
-        const matchArticulo = lineaLimpia.match(regexArticulo);
-
-        // Si la línea coincide con nuestro patrón de artículo...
-        if (matchArticulo) {
-            // ...y no es una línea de subtotal o total (para evitar duplicados)
-            if (!/TOTAL|SUBTOTAL|IVA|PAGO|CAMBIO/i.test(lineaLimpia)) {
-                
-                // El primer grupo capturado es la descripción, el segundo es el precio
-                let descripcion = matchArticulo[1].trim();
-                const precio = parseFloat(matchArticulo[2].replace(',', '.'));
-                
-                // Intento (muy simple) de extraer la cantidad si está al principio
-                let cantidad = 1; // Por defecto es 1
-                const matchCantidad = descripcion.match(/^(\d+)\s+(.*)/);
-                if (matchCantidad) {
-                    cantidad = parseInt(matchCantidad[1]);
-                    descripcion = matchCantidad[2]; // Actualizamos la descripción sin la cantidad
-                }
-
-                articulos.push({
-                    'Artículo': descripcion,
-                    'Cantidad': cantidad,
-                    'Precio': precio
-                });
-            }
-        }
-    }
-
-    return { resumen, articulos };
-}
-
-
-// =================================================================================
-// ¡NUEVA FUNCIÓN PARA CREAR UN EXCEL CON MÚLTIPLES HOJAS!
-// =================================================================================
-
-function crearYDescargarExcelDetallado(datos) {
-    // Crear un nuevo libro de trabajo
-    const wb = XLSX.utils.book_new();
-
-    // --- Hoja 1: Resumen del Ticket ---
-    // `json_to_sheet` espera un array de objetos, por eso ponemos [datos.resumen]
-    const ws_resumen = XLSX.utils.json_to_sheet([datos.resumen]);
-    XLSX.utils.book_append_sheet(wb, ws_resumen, 'Resumen');
-
-    // --- Hoja 2: Lista de Artículos ---
-    if (datos.articulos.length > 0) {
-        const ws_articulos = XLSX.utils.json_to_sheet(datos.articulos);
-        XLSX.utils.book_append_sheet(wb, ws_articulos, 'Artículos');
-    }
-
-    // Generar el archivo y forzar la descarga
-    XLSX.writeFile(wb, "ticket_detallado.xlsx");
-}
+    // Usar la API del Portapapeles del navegador (moderna y segura)
+    navigator.clipboard.writeText(resultText.value).then(() => {
+        // Feedback para el usuario
+        const originalText = copyButton.textContent;
+        copyButton.textContent = '¡Copiado!';
+        setTimeout(() => {
+            copyButton.textContent = originalText;
+        }, 1500); // Volver al texto original después de 1.5 segundos
+    }).catch(err => {
+        console.error('Error al copiar el texto: ', err);
+        alert('No se pudo copiar el texto. Por favor, hazlo manualmente.');
+    });
+});
