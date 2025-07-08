@@ -1,5 +1,5 @@
 # requirements.txt
 python-telegram-bot[ext]
-google-cloud-vision
-python-dotenv  # Útil para desarrollo local
-httpx # Necesario para el cliente asíncrono de telegram-bot
+requests  # Para hacer peticiones HTTP a la API de Google
+python-dotenv
+httpx
