@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Extractor de Tickets Gratuito</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Librerías que usaremos (cargadas desde un CDN para facilidad) -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <h1>Extractor de Datos de Tickets</h1>
+    <p>Arrastra una imagen o PDF de tu ticket aquí. Todo el proceso ocurre en tu navegador.</p>
+    
+    <!-- Añadimos un input de tipo 'file' como alternativa al arrastre -->
+    <input type="file" id="file-input" accept="image/*,application/pdf" style="display: none;">
+    
+    <div id="drop-zone" onclick="document.getElementById('file-input').click();">
+        <span id="drop-zone-text">Arrastra tu archivo aquí o haz clic para seleccionar</span>
+    </div>
+    
+    <div id="status">Esperando un archivo...</div>
+
+    <script src="app.js"></script>
+</body>
+</html>
