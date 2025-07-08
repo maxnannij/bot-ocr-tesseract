@@ -8,9 +8,9 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from google.cloud import vision
 
 # --- Configuración desde Variables de Entorno de Vercel ---
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_TOKEN = os.getenv('8134648679:AAGHHE6B4WmCutvopZgY58VXqcLDEoQesi8')
 # Decodificar las credenciales de Google desde Base64
-GOOGLE_CREDENTIALS_BASE64 = os.getenv('GOOGLE_CREDENTIALS_BASE64')
+GOOGLE_CREDENTIALS_BASE64 = os.getenv('AIzaSyBYx3oUg3J6t5nOqF35-A0LRlPWb7i05GA')
 
 # Escribir las credenciales decodificadas a un archivo temporal que la librería de Google puede leer
 # Vercel provee un sistema de archivos temporal en /tmp
@@ -19,7 +19,7 @@ if GOOGLE_CREDENTIALS_BASE64:
     decoded_creds = base64.b64decode(GOOGLE_CREDENTIALS_BASE64)
     with open(credentials_path, "w") as f:
         f.write(decoded_creds.decode('utf-8'))
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
+    os.environ['AIzaSyBYx3oUg3J6t5nOqF35-A0LRlPWb7i05GA'] = credentials_path
 
 # --- Lógica del Bot (similar a la anterior) ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
