@@ -3,77 +3,102 @@ import asyncio
 import json
 import logging
 import base64
+import requests # Importamos la librería requests
 from http.server import BaseHTTPRequestHandler
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from google.cloud import vision
 
 # --- CONFIGURACIÓN ---
-# Vercel leerá estos valores de las Variables de Entorno que configures en su panel.
+# Vercel leerá estos valores de las Variables de Entorno.
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+# Ahora usaremos la API Key de Google Vision
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY') # LLENAR CON API
 
-# Las credenciales de Google se leen de una variable de entorno en formato Base64
-# y se escriben en un archivo temporal que la librería de Google puede usar.
-# Esto es necesario en un entorno serverless como Vercel.
-GOOGLE_CREDENTIALS_BASE64 = os.getenv('GOOGLE_CREDENTIALS_BASE64')
-
-# Configuración del logging para ver errores en Vercel
+# Configuración del logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# --- LÓGICA DE GOOGLE VISION ---
+# --- LÓGICA DE GOOGLE VISION (con API Key y requests) ---
 def extraer_texto_de_imagen(image_bytes: bytes) -> str:
     """
-    Envía la imagen a la API de Google Vision y devuelve el texto extraído.
+    Envía la imagen a la API de Google Vision usando una API Key y devuelve el texto.
     """
-    try:
-        # La librería de Google Vision buscará las credenciales automáticamente
-        # en la ruta definida por la variable de entorno 'GOOGLE_APPLICATION_CREDENTIALS'.
-        client = vision.ImageAnnotatorClient()
-        image = vision.Image(content=image_bytes)
-        
-        # 'document_text_detection' es ideal para facturas y documentos densos.
-        response = client.document_text_detection(image=image)
-        
-        if response.error.message:
-            logger.error(f"Error en Google Vision API: {response.error.message}")
-            raise Exception(f"Google Vision API Error: {response.error.message}")
-            
-        return response.full_text_annotation.text
-    except Exception as e:
-        logger.error(f"Excepción al llamar a Google Vision: {e}")
-        return "Error al procesar la imagen con el servicio de extracción."
+    if not GOOGLE_API_KEY:
+        logger.error("La GOOGLE_API_KEY no está configurada en las variables de entorno.")
+        return "Error: La clave de API del servicio de visión no está configurada."
 
-# --- MANEJADORES DE COMANDOS DE TELEGRAM ---
+    vision_url = f"https://vision.googleapis.com/v1/images:annotate?key={GOOGLE_API_KEY}"
+    
+    # Codificar la imagen en Base64, que es como la API la espera
+    encoded_image = base64.b64encode(image_bytes).decode('utf-8')
+    
+    # Construir el cuerpo de la petición JSON
+    request_body = {
+        "requests": [
+            {
+                "image": {
+                    "content": encoded_image
+                },
+                "features": [
+                    {
+                        "type": "DOCUMENT_TEXT_DETECTION"
+                    }
+                ]
+            }
+        ]
+    }
+    
+    try:
+        # Hacer la petición POST a la API
+        response = requests.post(vision_url, json=request_body)
+        response.raise_for_status()  # Esto lanzará un error si la respuesta es 4xx o 5xx
+        
+        # Parsear la respuesta JSON
+        response_json = response.json()
+        
+        # Extraer el texto completo de la anotación
+        # La estructura de la respuesta puede ser compleja, hay que navegarla
+        if 'responses' in response_json and len(response_json['responses']) > 0:
+            first_response = response_json['responses'][0]
+            if 'fullTextAnnotation' in first_response:
+                return first_response['fullTextAnnotation']['text']
+            else:
+                logger.warning("No se encontró 'fullTextAnnotation' en la respuesta de la API.")
+                return "No se detectó texto en la imagen."
+        else:
+            logger.error(f"Respuesta inesperada de la API de Vision: {response_json}")
+            return "Error al analizar la respuesta del servicio de visión."
+            
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error en la petición a Google Vision: {e}")
+        return "Error de comunicación con el servicio de extracción de texto."
+    except Exception as e:
+        logger.error(f"Excepción inesperada en extraer_texto_de_imagen: {e}")
+        return "Ocurrió un error inesperado al procesar la imagen."
+
+
+# --- MANEJADORES DE TELEGRAM (sin cambios aquí) ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Responde al comando /start."""
-    await update.message.reply_text('¡Hola! Soy tu bot de facturas. Envíame una foto de un ticket o factura y extraeré el texto para ti.')
+    await update.message.reply_text('¡Hola! Soy tu bot de facturas. Envíame una foto y extraeré el texto.')
 
 async def procesar_imagen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Procesa una imagen recibida y extrae el texto."""
     if not update.message.photo:
         return
 
     await update.message.reply_text('Imagen recibida. Procesando...')
     
     try:
-        # Obtener el archivo de la foto con la mayor resolución
         file_id = update.message.photo[-1].file_id
         new_file = await context.bot.get_file(file_id)
-        
-        # Descargar la imagen en memoria como un array de bytes
         image_bytes = await new_file.download_as_bytearray()
         
-        # Llamar a la función de Google Vision
         texto_extraido = extraer_texto_de_imagen(bytes(image_bytes))
         
         if texto_extraido:
-            # Telegram tiene un límite de 4096 caracteres por mensaje.
-            # Dividimos el texto en trozos si es necesario.
             for i in range(0, len(texto_extraido), 4096):
                 await update.message.reply_text(texto_extraido[i:i + 4096])
         else:
@@ -81,37 +106,16 @@ async def procesar_imagen(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
     except Exception as e:
         logger.error(f"Error en procesar_imagen: {e}")
-        await update.message.reply_text('Lo siento, ocurrió un error inesperado al procesar tu imagen.')
+        await update.message.reply_text('Lo siento, ocurrió un error inesperado.')
 
-# --- PUNTO DE ENTRADA PARA VERCEL (SERVERLESS HANDLER) ---
+
+# --- PUNTO DE ENTRADA PARA VERCEL (sin cambios aquí, ya no maneja credenciales JSON) ---
 class handler(BaseHTTPRequestHandler):
-    
     def do_POST(self):
-        """Maneja las peticiones POST entrantes de Telegram (webhook)."""
-        # Configurar las credenciales de Google al inicio de cada invocación
-        if GOOGLE_CREDENTIALS_BASE64:
-            try:
-                credentials_path = "/tmp/google_credentials.json"
-                decoded_creds = base64.b64decode(GOOGLE_CREDENTIALS_BASE64)
-                with open(credentials_path, "w") as f:
-                    f.write(decoded_creds.decode('utf-8'))
-                os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
-            except Exception as e:
-                logger.error(f"Error al decodificar o escribir las credenciales de Google: {e}")
-                # Responder a Vercel para que no reintente
-                self.send_response(500)
-                self.end_headers()
-                self.wfile.write(b'Credentials setup error')
-                return
-
-        # Inicializar la aplicación del bot
         application = Application.builder().token(TELEGRAM_TOKEN).build()
-        
-        # Registrar los manejadores
         application.add_handler(CommandHandler("start", start))
         application.add_handler(MessageHandler(filters.PHOTO, procesar_imagen))
 
-        # Procesar la petición
         try:
             content_length = int(self.headers['Content-Length'])
             body = self.rfile.read(content_length)
@@ -120,10 +124,8 @@ class handler(BaseHTTPRequestHandler):
                 update = Update.de_json(json.loads(body.decode('utf-8')), application.bot)
                 await application.process_update(update)
 
-            # Ejecutar la función asíncrona
             asyncio.run(process_update_async())
             
-            # Responder a Telegram/Vercel que todo está bien
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b'OK')
@@ -133,5 +135,4 @@ class handler(BaseHTTPRequestHandler):
             self.send_response(500)
             self.end_headers()
             self.wfile.write(b'Error')
-
         return
