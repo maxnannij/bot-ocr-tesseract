@@ -1,0 +1,12 @@
+body { font-family: Arial, sans-serif; text-align: center; margin: 40px; }
+#drop-zone {
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    padding: 50px;
+    color: #aaa;
+    margin: 20px auto;
+    cursor: pointer;
+    max-width: 500px;
+}
+#drop-zone.dragover { background-color: #f0f8ff; border-color: #007bff; }
+#status { margin-top: 20px; font-weight: bold; }
