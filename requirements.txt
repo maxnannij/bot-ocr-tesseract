@@ -1,6 +1,5 @@
-# requirements.txt
 python-telegram-bot[ext]
 pytesseract
-Pillow # Dependencia de pytesseract para manejar imágenes
+Pillow
 python-dotenv
 httpx
