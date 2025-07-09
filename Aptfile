@@ -1,0 +1,4 @@
+# Aptfile
+tesseract-ocr
+tesseract-ocr-spa  # Paquete de idioma para español
+tesseract-ocr-eng  # Paquete de idioma para inglés
