@@ -1,8 +1,18 @@
 {
+  "builds": [
+    {
+      "src": "api/bot.py",
+      "use": "@vercel/python"
+    }
+  ],
   "functions": {
     "api/bot.py": {
-      "maxDuration": 30,
-      "memory": 512
+      "maxDuration": 45,
+      "memory": 1024
     }
-  }
+  },
+  "buildpacks": [
+    { "url": "https://github.com/heroku/heroku-buildpack-apt" },
+    { "url": "https://github.com/pathwaysmedical/heroku-buildpack-tesseract" }
+  ]
 }
