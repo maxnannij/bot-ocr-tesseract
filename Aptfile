@@ -1,4 +1,3 @@
-# Aptfile
 tesseract-ocr
-tesseract-ocr-spa  # Paquete de idioma para español
-tesseract-ocr-eng  # Paquete de idioma para inglés
+tesseract-ocr-spa
+tesseract-ocr-eng
