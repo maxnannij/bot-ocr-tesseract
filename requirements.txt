@@ -1,5 +1,6 @@
 # requirements.txt
 python-telegram-bot[ext]
-requests  # Para hacer peticiones HTTP a la API de Google
+pytesseract
+Pillow # Dependencia de pytesseract para manejar imágenes
 python-dotenv
 httpx
