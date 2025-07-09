@@ -1,59 +1,37 @@
+# api/bot.py
 import os
 import asyncio
 import json
 import logging
 from http.server import BaseHTTPRequestHandler
-from PIL import Image # Importamos la librería Pillow
-import pytesseract   # Importamos pytesseract
-import io            # Para manejar los bytes de la imagen en memoria
+from PIL import Image
+import pytesseract
+import io
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# --- CONFIGURACIÓN ---
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-# Ya no necesitamos GOOGLE_API_KEY
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- LÓGICA DE TESSERACT OCR ---
 def extraer_texto_de_imagen(image_bytes: bytes) -> str:
-    """
-    Usa Tesseract para extraer texto de una imagen en memoria.
-    """
     try:
-        # Tesseract necesita un objeto de imagen, no solo bytes.
-        # Usamos Pillow (PIL) para abrir la imagen desde los bytes en memoria.
         image = Image.open(io.BytesIO(image_bytes))
-        
-        # Llamamos a tesseract. especificamos el idioma (español + inglés).
-        # Tesseract intentará usar ambos.
+        # Especificamos los idiomas español e inglés
         texto_extraido = pytesseract.image_to_string(image, lang='spa+eng')
         
         if not texto_extraido.strip():
             logger.warning("Tesseract no devolvió texto.")
             return "No se pudo detectar texto en la imagen."
-            
         return texto_extraido
-        
     except Exception as e:
         logger.error(f"Error al procesar con Tesseract: {e}")
-        # Este error puede ocurrir si Tesseract no está instalado correctamente en el entorno.
         return "Ocurrió un error en el motor de extracción de texto (OCR)."
 
-#
-# ... EL RESTO DEL CÓDIGO (MANEJADORES DE TELEGRAM Y LA CLASE HANDLER) SE MANTIENE EXACTAMENTE IGUAL ...
-#
-# Solo asegúrate de que la función procesar_imagen() llame a la nueva versión de extraer_texto_de_imagen().
-# El código que te he proporcionado en respuestas anteriores ya está bien estructurado para esto.
-# Solo reemplaza la función extraer_texto_de_imagen y los imports.
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text('¡Hola! Soy tu bot de facturas (versión Tesseract). Envíame una foto y extraeré el texto.')
+    await update.message.reply_text('¡Hola! Soy tu bot de facturas con Tesseract. Envíame una foto y extraeré el texto.')
 
 async def procesar_imagen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.photo:
@@ -70,7 +48,6 @@ async def procesar_imagen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error en procesar_imagen: {e}")
         await update.message.reply_text('Lo siento, ocurrió un error inesperado.')
-
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
